@@ -1,24 +1,26 @@
 """
-maze.py — Pac-Man gridworld environment
+maze.py — Pac-Man gridworld environments
 
-The agent starts top-left and must reach the GOAL cell (bottom-right).
-Pellets scattered through the maze give small bonus rewards along the way,
-but the win condition is simply: reach the goal.
+The agent starts top-left (1,1) and must reach GOAL (8,8).
+Pellets give small bonus rewards along the way but the win condition
+is reaching the goal cell.
 
-This keeps the state space small — state = (row, col) — so Q-learning
-converges quickly and cleanly.
+Two maze layouts are provided:
+  MAZE_1 — branching paths, diagonal route through the middle
+  MAZE_2 — tight spiral, completely different optimal path
+             (used to demonstrate that Q-learning memorises, not generalises)
 
-Grid cell values:
-  0 = empty floor
-  1 = wall
-  2 = pellet  (+5 bonus, visual)
-  3 = power pellet (+15 bonus, visual)
-  G = goal cell (+100, episode ends)
+State  : (row, col)
+Actions: 0=UP  1=DOWN  2=LEFT  3=RIGHT
 """
 
 import copy
 
-DEFAULT_MAZE = [
+# ---------------------------------------------------------------------------
+# Maze 1 — default training maze
+# Optimal path: right along row 1, then zigzag through middle to (8,8)
+# ---------------------------------------------------------------------------
+MAZE_1 = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     [1, 0, 2, 2, 2, 2, 2, 2, 2, 1],
     [1, 2, 1, 1, 2, 1, 2, 1, 2, 1],
@@ -31,30 +33,53 @@ DEFAULT_MAZE = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ]
 
+# ---------------------------------------------------------------------------
+# Maze 2 — spiral layout
+# Optimal path: right along row 1 → down right side → left along row 3 →
+#               down left side → right along row 5 → down right side → goal
+# The agent trained on MAZE_1 will get stuck: it tries to go DOWN at (1,4)
+# which is a wall in MAZE_2, and its Q-table has no knowledge of this layout.
+# ---------------------------------------------------------------------------
+MAZE_2 = [
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 2, 2, 2, 2, 2, 2, 1, 1],
+    [1, 1, 1, 1, 1, 1, 1, 2, 1, 1],
+    [1, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+    [1, 2, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 2, 1],
+    [1, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+    [1, 2, 1, 1, 1, 1, 1, 1, 2, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+]
+
+# Keep backward-compatible name
+DEFAULT_MAZE = MAZE_1
+
 AGENT_START = (1, 1)
-GOAL        = (8, 8)   # agent must reach this cell to win
+GOAL        = (8, 8)
 
 R_STEP         =  -1
 R_PELLET       =   5
 R_POWER_PELLET =  15
-R_GOAL         = 100   # large reward for reaching the exit
-MAX_STEPS      = 300
+R_GOAL         = 100
+MAX_STEPS      = 400
 
 
 class MazeEnv:
     """
-    Pac-Man gridworld — navigate to the goal, eat pellets along the way.
+    Pac-Man gridworld — navigate to the goal, collect pellets along the way.
 
-    State  : (row, col)      — 45 reachable cells → tiny Q-table
-    Actions: 0=UP 1=DOWN 2=LEFT 3=RIGHT
-    Win    : agent reaches GOAL cell
+    State  : (row, col)
+    Actions: 0=UP  1=DOWN  2=LEFT  3=RIGHT
+    Win    : agent reaches GOAL
     """
 
     ACTIONS      = {0: (-1, 0), 1: (1, 0), 2: (0, -1), 3: (0, 1)}
     ACTION_NAMES = {0: "UP", 1: "DOWN", 2: "LEFT", 3: "RIGHT"}
 
     def __init__(self, maze_layout=None):
-        self.maze_layout   = maze_layout or DEFAULT_MAZE
+        self.maze_layout   = maze_layout if maze_layout is not None else MAZE_1
         self.nrows         = len(self.maze_layout)
         self.ncols         = len(self.maze_layout[0])
         self.total_pellets = sum(
@@ -86,8 +111,6 @@ class MazeEnv:
 
         r, c = self.agent_pos
         cell = self.grid[r][c]
-
-        # Pellet bonuses (visual + small reward, not the win condition)
         if cell == 2:
             reward += R_PELLET
             self.pellets_eaten += 1
@@ -97,12 +120,10 @@ class MazeEnv:
             self.pellets_eaten += 1
             self.grid[r][c] = 0
 
-        # Win: reached the goal
         if tuple(self.agent_pos) == GOAL:
             reward    += R_GOAL
             self.done  = True
 
-        # Timeout
         if self.steps >= MAX_STEPS:
             self.done = True
 
@@ -110,8 +131,6 @@ class MazeEnv:
             "pellets_eaten": self.pellets_eaten,
             "total_pellets": self.total_pellets,
             "steps":         self.steps,
-            "won":           tuple(self.agent_pos) == GOAL or
-                             (self.done and tuple(self.agent_pos) == GOAL),
         }
         return self._get_state(), reward, self.done, info
 
