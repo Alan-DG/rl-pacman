@@ -1,37 +1,44 @@
 # RL Pac-Man — Q-learning demo
 
-A Pac-Man-style gridworld where a reinforcement learning agent learns to navigate a maze, collect pellets, and avoid a ghost — using **tabular Q-learning**.
+A Pac-Man-style gridworld where a reinforcement learning agent learns to
+navigate a maze from start to goal using **tabular Q-learning**.
 
 Built as a demo for an Advanced Machine Learning presentation.
 
 ---
 
-## What this demonstrates
+## What the agent does
 
-| Concept | Implementation |
-|---|---|
-| **Reinforcement Learning** | Agent learns by trial and error, no labelled data |
-| **Q-learning** | Tabular Q-table updated after every action |
-| **Exploration vs exploitation** | ε-greedy policy with epsilon decay |
-| **Reward shaping** | +10 pellet, +30 power pellet, -100 ghost, -1/step |
-| **Learning curve** | Reward increases as Q-table converges |
+The agent starts top-left `(1,1)` and must reach the goal cell bottom-right
+`(8,8)`. Pellets are scattered through the maze and give small bonus rewards
+when walked over, but the **win condition is simply reaching the goal**.
+
+This keeps the state space small — `state = (row, col)` — so Q-learning
+converges in under a second and the learned policy is easy to inspect and
+explain.
+
+There is no Pac-Man ghost. The scope was deliberately kept minimal so the focus
+stays on the RL fundamentals rather than environment complexity.
 
 ---
 
 ## Quick start
 
 ```bash
-# 1. Clone and install dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# 2. Run the full demo (train + visual playback)
+# Train + watch the demo (recommended)
 python demo.py
 
-# 3. Train only (no window, saves results/)
+# Train only, headless (saves results/)
 python src/train.py
 
-# 4. Train with more episodes for better performance
+# More episodes for a sharper policy
 python demo.py --episodes 3000
+
+# Slower playback for presentations
+python demo.py --fps 3
 ```
 
 ---
@@ -40,9 +47,13 @@ python demo.py --episodes 3000
 
 | Key | Action |
 |---|---|
-| `Q` | Toggle Q-policy overlay (shows best action per cell) |
+| `Q` | Toggle policy overlay — shows the best learned action per cell |
 | `SPACE` | Pause / resume |
 | `ESC` | Quit |
+
+The policy overlay is the most useful thing to show during a presentation:
+every floor cell gets a directional arrow showing what the agent has learned
+to do from that position.
 
 ---
 
@@ -50,24 +61,41 @@ python demo.py --episodes 3000
 
 ```
 rl-pacman/
-├── demo.py              ← entry point for presentation
+├── demo.py              ← run this for the presentation
 ├── requirements.txt
 ├── README.md
 ├── src/
-│   ├── maze.py          ← gridworld environment
-│   ├── agent.py         ← Q-learning agent
-│   ├── train.py         ← training loop + KPI logging
+│   ├── maze.py          ← gridworld: layout, rewards, step logic
+│   ├── agent.py         ← Q-learning: Q-table, ε-greedy, update rule
+│   ├── train.py         ← training loop, KPI logging, reward plot
 │   └── renderer.py      ← pygame visualisation
-└── results/
-    ├── rewards.csv       ← per-episode log (auto-generated)
-    └── reward_curve.png  ← learning curve plot (auto-generated)
+└── results/             ← auto-generated when you run training
+    ├── rewards.csv
+    └── reward_curve.png
 ```
+
+---
+
+## Reward structure
+
+| Event | Reward |
+|---|---|
+| Each step taken | −1 |
+| Walking over a pellet | +5 |
+| Walking over a power pellet | +15 |
+| Reaching the goal | +100 |
+| Timeout (300 steps) | episode ends, no bonus |
+
+The step penalty encourages the agent to find a short path. The goal reward
+dominates, so the agent always prioritises reaching the exit over collecting
+every pellet.
 
 ---
 
 ## How Q-learning works
 
-The agent maintains a **Q-table** — a lookup table mapping every `(state, action)` pair to an expected future reward.
+The agent maintains a **Q-table** — a lookup table mapping every
+`(state, action)` pair to an expected future reward.
 
 After each action it updates its estimate:
 
@@ -75,44 +103,48 @@ After each action it updates its estimate:
 Q(s, a) ← Q(s, a) + α · [r + γ · max Q(s', a') − Q(s, a)]
 ```
 
-| Symbol | Name | Meaning |
-|---|---|---|
-| `α` | Learning rate | How fast to update (0.1) |
-| `γ` | Discount factor | How much to value future rewards (0.95) |
-| `r` | Reward | What the agent just received |
-| `max Q(s', a')` | Best future value | Best known action from next state |
+| Symbol | Name | Value | Meaning |
+|---|---|---|---|
+| `α` | Learning rate | 0.1 | How much to shift the estimate each update |
+| `γ` | Discount factor | 0.95 | How much future rewards are worth vs immediate |
+| `r` | Reward | varies | What the agent received for this action |
+| `max Q(s', a')` | Best future Q | — | Best known value reachable from next state |
 
-**Exploration vs exploitation:** the agent starts fully random (ε=1.0) and gradually becomes more greedy (ε decays to 0.05), exploiting what it has learned.
+**Exploration vs exploitation (ε-greedy):** the agent starts fully random
+(`ε = 1.0`) and gradually shifts toward exploiting its learned Q-table
+(`ε` decays to `0.05`). This ensures it explores the maze before committing
+to a fixed policy.
 
 ---
 
 ## KPIs
 
-After training, `results/rewards.csv` contains per-episode:
+`results/rewards.csv` — one row per training episode:
 
 | Column | Description |
 |---|---|
 | `episode` | Episode number |
-| `total_reward` | Sum of rewards in that episode |
-| `steps` | Steps taken |
-| `epsilon` | Exploration rate at that point |
-| `pellets` | Pellets collected |
-| `won` | 1 if all pellets collected, else 0 |
+| `total_reward` | Sum of all rewards in that episode |
+| `steps` | Steps taken before win or timeout |
+| `epsilon` | Exploration rate at end of episode |
+| `pellets` | Number of pellets collected |
+| `won` | `1` if the agent reached the goal, `0` otherwise |
 
-The reward curve (`results/reward_curve.png`) visualises the learning progression — reward should increase and win rate should climb as training progresses.
+`results/reward_curve.png` — two plots: smoothed reward per episode and
+rolling win rate. Both should trend upward as training progresses.
 
 ---
 
 ## Hyperparameters
 
-Tunable in `src/agent.py`:
+Defined in `src/agent.py`:
 
 | Parameter | Default | Effect |
 |---|---|---|
-| `alpha` | 0.1 | Higher = faster learning, less stable |
-| `gamma` | 0.95 | Higher = agent plans further ahead |
-| `epsilon_decay` | 0.995 | Lower = explores less, exploits sooner |
-| `epsilon_min` | 0.05 | Always keeps 5% random exploration |
+| `alpha` | 0.1 | Higher = faster updates, less stable |
+| `gamma` | 0.95 | Higher = agent values long-term rewards more |
+| `epsilon_decay` | 0.997 | Lower = stops exploring sooner |
+| `epsilon_min` | 0.05 | Floor — always keeps 5% random exploration |
 
 ---
 
