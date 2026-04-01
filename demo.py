@@ -62,7 +62,14 @@ def _run_random_episodes(renderer, env, n=3, fps=3, steps_limit=90):
         state = env.reset()
         done  = False
         steps = 0
+        # Render once after reset so the episode-start position is visible
+        if not renderer.render(ep, 0, 1.0):
+            return False
         while not done and steps < steps_limit:
+            # Honour pause: keep drawing without stepping
+            while renderer._paused:
+                if not renderer.render(ep, 0, 1.0):
+                    return False
             action = agent.choose_action(state)
             state, _, done, _ = env.step(action)
             steps += 1

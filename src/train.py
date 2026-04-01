@@ -119,7 +119,6 @@ def train(
             "total_reward": round(total_r, 2),
             "steps":        info["steps"],
             "epsilon":      round(agent.epsilon, 4),
-            "pellets":      info["pellets_eaten"],
             "won":          won,
         })
 

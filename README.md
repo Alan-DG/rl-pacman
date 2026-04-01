@@ -1,182 +1,316 @@
-# RL Pac-Man — Q-learning demo
+# RL Pac-Man — Q-learning presentation demo
 
-A Pac-Man-style gridworld where a reinforcement learning agent learns to
-navigate a maze from start to goal using **tabular Q-learning**.
+A compact **reinforcement learning** project where a tabular **Q-learning** agent learns
+to solve a Pac-Man-style maze by moving from a fixed start cell to a goal cell.
 
-Built as a demo for an Advanced Machine Learning presentation.
+This project was built as a presentation/demo for an Advanced Machine Learning class.
+It is intentionally small and visual, so the learning process is easy to explain live.
 
 ---
 
-## What the agent does
+## Project overview
 
-The agent starts top-left `(1,1)` and must reach the goal cell `(8,8)`.
-Pellets scattered through the maze give small bonus rewards when walked over,
-but the **win condition is simply reaching the goal**.
+The environment is a 10×10 grid maze.
 
-The state is just `(row, col)` — a tiny state space — so Q-learning converges
-fast and the learned policy is easy to inspect and explain.
+- **State**: the agent's grid position `(row, col)`
+- **Actions**: `UP`, `DOWN`, `LEFT`, `RIGHT`
+- **Objective**: reach the goal cell as efficiently as possible
+- **Learning method**: tabular Q-learning with **ε-greedy** exploration
 
-There is no ghost. Scope was kept deliberately minimal so the focus stays on
-RL fundamentals rather than environment complexity.
+The simplicity is deliberate:
+- the Q-table stays interpretable
+- training converges quickly
+- the effects of exploration, exploitation, and reward shaping are easy to show
+
+There are **two maze layouts**:
+- **MAZE_1**: the main training maze used for the core demo
+- **MAZE_2**: a different layout used to show that tabular Q-learning does **not**
+  generalise automatically to a new environment
+
+---
+
+## Current demo structure
+
+The main presentation script is `demo.py`.
+
+It runs as a **5-act interactive demo**:
+
+| Act | Title | Purpose |
+|-----|-------|---------|
+| 1 | Untrained agent | Shows pure random behaviour before learning |
+| 2 | Live training | Shows snapshot episodes during training so the audience can watch improvement |
+| 3 | Trained agent | Shows a converged agent solving the maze cleanly |
+| 4 | Transfer to new maze | Shows that the learned Q-table fails on a different layout, then retrains from scratch |
+| 5 | Exploration vs exploitation | Shows the same trained agent under different ε values |
+
+This structure is designed for a live class presentation where you want both:
+1. a visual intuition for RL  
+2. a concrete example of how Q-learning improves behaviour over time
+
+---
+
+## Environment details
+
+Defined in `maze.py`.
+
+### Start and goal
+- **Start**: `(1, 1)`
+- **Goal**: `(8, 8)`
+
+### Action mapping
+- `0 = UP`
+- `1 = DOWN`
+- `2 = LEFT`
+- `3 = RIGHT`
+
+### Episode ending conditions
+An episode ends when:
+- the agent reaches the goal, or
+- the agent hits the timeout limit of **400 steps**
+
+### Reward structure
+The current reward system is:
+
+| Event | Reward |
+|------|--------|
+| Any step | `-1` |
+| Reaching the goal | `+100` |
+
+That means a winning episode has:
+
+`total_reward = 100 - number_of_steps`
+
+So if the agent reaches the goal in the optimal **14 steps**, the theoretical maximum episode reward is:
+
+`+86`
+
+---
+
+## How the agent learns
+
+Defined in `agent.py`.
+
+The project uses standard **tabular Q-learning**:
+
+`Q(s, a) ← Q(s, a) + α · [r + γ · max Q(s', a') − Q(s, a)]`
+
+### Default hyperparameters
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `alpha` | `0.1` | Learning rate |
+| `gamma` | `0.95` | Discount factor |
+| `epsilon` | `1.0` | Initial exploration rate |
+| `epsilon_min` | `0.05` | Minimum exploration rate |
+| `epsilon_decay` | `0.997` | Multiplicative ε decay after each episode |
+
+### Exploration vs exploitation
+The agent uses **ε-greedy** action selection:
+- high ε → more random exploration
+- low ε → more exploitation of learned Q-values
+
+This is visualised directly in **Act 5** of the demo.
+
+---
+
+## Main files
+
+The project currently consists of these main files:
+
+```text
+README.md
+demo.py
+generate_figures.py
+requirements.txt
+
+results/reward_curve.png
+results/rewards.csv
+results/figures/01_steps_to_goal.png
+results/figures/02_epsilon_winrate.png
+results/figures/03_reward_curve_annotated.png
+results/figures/04_qtable_heatmap.png
+results/figures/05_path_trace.png
+
+slides/presentation_script.md
+slides/rl-pacman.pptx
+
+src/agent.py
+src/maze.py
+src/renderer.py
+src/train.py
+```
+
+The rewards csv and plot are output after training and the results/figures are output from the csv through generate_figures.py.
+See below for further details.
+
+### File roles
+
+- **`maze.py`**  
+  Defines the environment, both maze layouts, reward logic, and step mechanics.
+
+- **`agent.py`**  
+  Implements the tabular Q-learning agent and ε-greedy policy.
+
+- **`train.py`**  
+  Runs training, logs KPIs per episode, and saves results to CSV / plot output.
+
+- **`demo.py`**  
+  Runs the full live presentation demo in 5 acts.
+
+- **`renderer.py`**  
+  Handles the pygame visualisation, overlays, controls, HUD, and transition screens.
+
+- **`generate_figures.py`**  
+  Generates polished static figures for slides/reporting based on training results.
 
 ---
 
 ## Quick start
 
+Install dependencies:
+
 ```bash
-# Install dependencies
 pip install -r requirements.txt
+```
 
-# Run the full 5-act presentation demo
+### Run the full presentation demo
+```bash
 python demo.py
+```
 
-# Jump straight to a specific act
+### Jump straight to a specific act
+```bash
 python demo.py --act 3
+```
 
-# Slow everything down (useful on slower machines)
+### Slow the demo down
+```bash
 python demo.py --fps 4
+```
 
-# Headless training only (saves results/)
-python src/train.py
+### Run training headlessly
+```bash
+python train.py --episodes 300
+```
+
+### Regenerate the presentation figures
+```bash
+python generate_figures.py
 ```
 
 ---
 
-## Demo structure
+## Training outputs
 
-The demo runs as five acts. Press **SPACE** or **ENTER** to advance between
-acts; **ESC** quits at any point.
+Training saves outputs under `results/`.
 
-| Act | Title | What it shows |
-|-----|-------|---------------|
-| 1 | Untrained agent | Pure random exploration — stumbling, no goal |
-| 2 | Live training | Snapshots at episodes 1, 8, 20, 50, 100, 200 — watch it learn |
-| 3 | Trained agent | Clean optimal run + Q-heatmap + policy arrows |
-| 4 | New maze transfer | Same Q-table fails on MAZE_2; retrain → works again |
-| 5 | Exploration vs exploitation | Same agent at ε = 1.0 → 0.5 → 0.15 → 0.0 |
-
----
-
-## Controls (pygame window)
-
-| Key | Action |
-|-----|--------|
-| `H` | Toggle Q-value heatmap (cell colour = learned value: blue → red) |
-| `Q` | Toggle policy overlay (best learned action per cell) |
-| `SPACE` | Pause / resume |
-| `ESC` | Quit |
-
-The heatmap and policy arrows work simultaneously. Both are most informative
-after training converges (Act 3).
-
----
-
-## Project structure
-
-```
-rl-pacman/
-├── demo.py              ← run this for the presentation
-├── requirements.txt
-├── README.md
-├── src/
-│   ├── maze.py          ← two maze layouts, rewards, step logic
-│   ├── agent.py         ← Q-learning: Q-table, ε-greedy, update rule
-│   ├── train.py         ← training loop, snapshot rendering, KPI logging
-│   └── renderer.py      ← pygame window, heatmap, policy overlay
-└── results/             ← auto-generated on first training run
-    ├── rewards.csv
-    └── reward_curve.png
-```
-
----
-
-## Mazes
-
-Two layouts are included, both 10×10 with the same start `(1,1)` and goal `(8,8)`.
-
-**MAZE_1** — branching paths, diagonal route through the middle. Used for Acts 1–3 and Act 5.
-
-**MAZE_2** — tight spiral layout. Optimal path winds right → down → left → down → right before reaching the goal, making it roughly twice as long as MAZE_1's route. Used in Act 4 to demonstrate that Q-learning memorises a specific layout rather than generalising.
-
----
-
-## Reward structure
-
-| Event | Reward |
-|-------|--------|
-| Each step taken | −1 |
-| Walking over a pellet | +5 |
-| Walking over a power pellet | +15 |
-| Reaching the goal | +100 |
-| Timeout (400 steps) | episode ends, no bonus |
-
-The step penalty encourages short paths. The goal reward dominates, so the
-agent always prioritises reaching the exit.
-
----
-
-## How Q-learning works
-
-The agent maintains a **Q-table** — a lookup table mapping every
-`(state, action)` pair to an expected future reward.
-
-After each action it updates its estimate:
-
-```
-Q(s, a) ← Q(s, a) + α · [r + γ · max Q(s', a') − Q(s, a)]
-```
-
-| Symbol | Name | Value | Meaning |
-|--------|------|-------|---------|
-| `α` | Learning rate | 0.1 | How much to shift the estimate each update |
-| `γ` | Discount factor | 0.95 | How much future rewards are worth vs immediate |
-| `r` | Reward | varies | What the agent received for this action |
-| `max Q(s', a')` | Best future Q | — | Best known value reachable from next state |
-
-**Exploration vs exploitation (ε-greedy):** the agent starts fully random
-(`ε = 1.0`) and gradually shifts to exploiting its learned Q-table
-(`ε` decays to `0.05`). Act 5 demonstrates this directly: the same trained
-agent runs at ε = 1.0, 0.5, 0.15, and 0.0 — path length drops from ~200
-steps down to the optimal 14.
-
----
-
-## KPIs
-
-`results/rewards.csv` — one row per training episode:
+### `results/rewards.csv`
+Episode-level training log with the following fields:
 
 | Column | Description |
 |--------|-------------|
 | `episode` | Episode number |
-| `total_reward` | Sum of all rewards in that episode |
-| `steps` | Steps taken before win or timeout |
-| `epsilon` | Exploration rate at end of episode |
-| `pellets` | Number of pellets collected |
-| `won` | `1` if the agent reached the goal, `0` otherwise |
+| `total_reward` | Sum of rewards collected in that episode |
+| `steps` | Number of steps taken before goal or timeout |
+| `epsilon` | Exploration rate after the episode |
+| `won` | `1` if the goal was reached, otherwise `0` |
 
-`results/reward_curve.png` — smoothed reward per episode (left) and rolling
-win rate (right). Both trend upward as training progresses.
+### `results/reward_curve.png`
+Generated by `train.py`.  
+Contains:
+- reward per episode
+- rolling win rate
+
+### `results/figures/`
+Generated by `generate_figures.py`.  
+Current figure set:
+
+- `01_steps_to_goal.png`
+- `02_epsilon_winrate.png`
+- `03_reward_curve_annotated.png`
+- `04_qtable_heatmap.png`
+- `05_path_trace.png`
+
+These are intended for presentation slides and explainability.
 
 ---
 
-## Hyperparameters
+## Static figures explained
 
-Defined in `src/agent.py`:
+`generate_figures.py` creates a slide-friendly visual summary of the training process.
 
-| Parameter | Default | Effect |
-|-----------|---------|--------|
-| `alpha` | 0.1 | Higher = faster updates, less stable |
-| `gamma` | 0.95 | Higher = agent values long-term rewards more |
-| `epsilon_decay` | 0.997 | Lower = stops exploring sooner |
-| `epsilon_min` | 0.05 | Floor — retains 5% random exploration throughout |
+### 1. Steps to goal per episode
+Shows how the number of steps drops over training and approaches the optimal path length.
 
-`src/train.py` also accepts `initial_epsilon` and `maze_layout` overrides,
-used internally by the demo for different training scenarios.
+### 2. Exploration vs exploitation
+Plots ε decay against rolling win rate to show how performance improves as random exploration decreases.
+
+### 3. Total reward per episode
+Shows the reward curve over time and marks the theoretical maximum based on the current reward design.
+
+### 4. Q-table heatmap
+Compares early vs trained Q-values across the maze to show how value concentrates along good routes.
+
+### 5. Agent path trace
+Compares a random/untrained path to a greedy/trained path.
+
+---
+
+## Controls during the pygame demo
+
+Available in the main window:
+
+| Key | Action |
+|-----|--------|
+| `Q` | Toggle policy arrows |
+| `H` | Toggle Q-value heatmap |
+| `SPACE` | Pause / resume |
+| `S` | Skip current episode |
+| `-` / `+` | Decrease / increase FPS |
+| `ESC` | Quit |
+
+There are also clickable on-screen buttons for the same controls.
+
+---
+
+## Important note about reproducibility
+
+`generate_figures.py` reads from `results/rewards.csv` if it already exists.
+So if you change the reward function or environment logic, you should regenerate the training results first.
+
+Recommended workflow:
+
+```bash
+python train.py --episodes 300
+python generate_figures.py
+```
+
+If needed, delete the old `results/rewards.csv` first so the figures cannot be generated from stale logs.
+
+---
+
+## Educational purpose of this project
+
+This project is intentionally **not** a full Pac-Man clone and **not** a deep RL system.
+
+Its purpose is to demonstrate, clearly and visually:
+
+- how an RL agent improves through repeated interaction
+- what a Q-table represents
+- why exploration matters early in training
+- how exploitation emerges later
+- why tabular Q-learning learns a policy for a specific environment rather than true generalisation
+
+That makes it a good teaching example for a short classroom presentation.
 
 ---
 
 ## Dependencies
 
-- `pygame` — animated maze window
-- `numpy` — Q-table operations
-- `matplotlib` — reward curve plot
+Current code requires:
+
+- `pygame`
+- `numpy`
+- `matplotlib`
+
+`matplotlib` is needed for figure generation and saved training plots.
