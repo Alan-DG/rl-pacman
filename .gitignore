@@ -15,6 +15,7 @@ venv/
 .venv/
 env/
 .env/
+pacvenv/
 
 # Generated results (created when you run training)
 results/*.csv
